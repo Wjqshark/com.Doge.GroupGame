@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.Doge.GroupGame", "CQP.Plugins\com.Doge.GroupGame.csproj", "{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
