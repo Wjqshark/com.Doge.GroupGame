@@ -26,13 +26,10 @@ namespace com.Doge.GroupGame.Plugin
         private bool m_IsLoadDb = false;
 
         /// <summary>
-        /// 随机数生成
+        /// 游戏列表
         /// </summary>
-        private Random m_Rand = new Random();
-        /// <summary>
-        /// qq群里qq号字典
-        /// </summary>
-        private Dictionary<long, List<long>> m_QQdics = new Dictionary<long, List<long>>();
+        private List<Game> m_GameList = new List<Game>();
+
         /// <summary>
         /// 开启qq群列表
         /// </summary>
@@ -41,6 +38,14 @@ namespace com.Doge.GroupGame.Plugin
         /// 等级描述字典
         /// </summary>
         private Dictionary<int, string> m_LevelDic = new Dictionary<int, string>();
+
+        #endregion
+
+        #region flag
+
+        private bool m_flag;
+
+        System.Timers.Timer m_Timer = new System.Timers.Timer(300);
 
         #endregion
 
@@ -64,6 +69,26 @@ namespace com.Doge.GroupGame.Plugin
         /// <returns></returns>
         public override int ProcessGroupMessage(int subType, int sendTime, long fromGroup, long fromQq, string fromAnonymous, string msg, int font)
         {
+            if (m_GameList.Exists(t => t.QQGroup == fromGroup))
+            {
+                if (msg.StartsWith("#") && m_flag == false)
+                {
+                    if (msg.Contains("#查询信息") || msg.Contains("#查询我的信息"))
+                    {
+                        GetPlayerInfoThread(fromGroup, msg, fromQq);
+                    }
+                    else if (msg.Contains("#查询等级名称"))
+                    {
+                        AskForLevelDescriptionThread(fromQq, msg, fromGroup);
+                    }
+                    SetBusy();
+                    return 1;
+                }
+                //else if()
+                //{
+
+                //}
+            }
             return base.ProcessGroupMessage(subType, sendTime, fromGroup, fromQq, fromAnonymous, msg, font);
         }
 
@@ -79,7 +104,7 @@ namespace com.Doge.GroupGame.Plugin
         /// <returns></returns>
         public override int ProcessGroupMemberIncrease(int subType, int sendTime, long fromGroup, long fromQq, long target)
         {
-            UpdateQQListThread(fromGroup);
+            UpdateQQListThread(fromGroup, fromQq);
             return base.ProcessGroupMemberIncrease(subType, sendTime, fromGroup, fromQq, target);
         }
 
@@ -94,30 +119,32 @@ namespace com.Doge.GroupGame.Plugin
         /// <returns></returns>
         public override int ProcessPrivateMessage(int subType, int sendTime, long fromQq, string msg, int font)
         {
-            //if (msg == "连接sqlite数据库")
-            //{
-            //    //ConnectDbThread();
-            //    if (!m_IsLoadDb)
-            //    {
-            //        StartThead(ConnectDb);
-            //    }
-            //    m_IsLoadDb = true;
-            //}
-            if (msg.Contains("QQ群大战游戏开启"))
+            if (msg.StartsWith("#") && m_flag == false)
             {
-                //GetLevelDictionary(fromQq);
-                StartGameThread(msg,fromQq);
-            }
-            //if (msg == "加载等级字典")
-            //{
-            //    GetLevelDictionary(fromQq);
-            //}
-            else if(msg.Contains("查询等级名称"))
-            {
-                AskForLevelDescriptionThread(fromQq, msg);
+                if (msg.Contains("#游戏开启") && fromQq == 719539302)
+                {
+                    StartGameThread(msg, fromQq);
+                }
+                SetBusy();
+                return 1;
             }
 
             return base.ProcessPrivateMessage(subType, sendTime, fromQq, msg, font);
+        }
+
+
+        /// <summary>
+        /// 设置忙碌
+        /// </summary>
+        public void SetBusy()
+        {
+            m_flag = true;
+            m_Timer.Elapsed += (sender, args) =>
+            {
+                m_Timer.Stop();
+                m_flag = false;
+            };
+            m_Timer.Start();
         }
 
 
@@ -180,24 +207,10 @@ namespace com.Doge.GroupGame.Plugin
             try
             {
                 object[] paramaters = (object[])obj;
-
                 long fromGroup = (long)paramaters[2];
                 long fromQq = (long)paramaters[3];
                 string msg = (string)paramaters[5];
 
-                if (!m_QQdics.ContainsKey(fromGroup))
-                {
-                    //获取群成员 需要api权限160
-                    List<GroupMemberInfo> memebers = CoolQApi.GetGroupMemberList(fromGroup).Model.ToList();
-                    m_QQdics.Add(fromGroup, memebers.Select(t => t.Number).ToList());
-
-                }
-                List<long> qqList = CheckHasAtQQ(m_QQdics[fromGroup], msg);
-
-                if (qqList.Count > 0)
-                {
-
-                }
             }
             catch (Exception e)
             {
@@ -210,9 +223,9 @@ namespace com.Doge.GroupGame.Plugin
         /// 更新QQ列表进程
         /// </summary>
         /// <param name="groupqq"></param>
-        private void UpdateQQListThread(long groupqq)
+        private void UpdateQQListThread(long groupqq, long newqq)
         {
-            object[] paramaters = new object[] { groupqq };
+            object[] paramaters = new object[] { groupqq, newqq };
             Thread mainThread = new Thread(new ParameterizedThreadStart(UpdateQQList));
             mainThread.Start(paramaters);
         }
@@ -226,18 +239,32 @@ namespace com.Doge.GroupGame.Plugin
             object[] paramaters = (object[])obj;
 
             long groupQQ = (long)paramaters[0];
-
-            //获取群成员 需要api权限160
-            List<GroupMemberInfo> memebers = CoolQApi.GetGroupMemberList(groupQQ).Model.ToList();
-
-            if (!m_QQdics.ContainsKey(groupQQ))
+            long newqq = (long)paramaters[1];
+            var game = m_GameList.FirstOrDefault(t => t.QQGroup == groupQQ);
+            if (game != null)
             {
-                m_QQdics.Add(groupQQ, memebers.Select(t => t.Number).ToList());
+                //List<GroupMemberInfo> memebers = CoolQApi.GetGroupMemberList(groupQQ).Model.ToList();
+                //查库，如果库里有取库里数据，没有新添加角色
+                var newPlayer = game.Players.FirstOrDefault(t => t.QQ == newqq);
+                if (newPlayer == null)
+                {
+                    Player player = SqliteHelper.Instance.GetPlayerFromDb(groupQQ, newqq);
+                    if (player == null)
+                    {
+                        player = new Player()
+                        {
+                            Level = 1,
+                            QQ = newqq,
+                            State = 0
+                        };
+                    }
+                    game.Players.Add(player);
+                    SqliteHelper.Instance.UpdatePlayers(groupQQ, game.Players);
+                }
             }
-            else
-            {
-                m_QQdics[groupQQ] = memebers.Select(t => t.Number).ToList();
-            }
+
+
+
         }
 
         /// <summary>
@@ -285,11 +312,7 @@ namespace com.Doge.GroupGame.Plugin
             string startmsg = paramaters[1].ToString();
 
 
-            string str = startmsg.Replace("QQ群大战游戏开启", "");
-            str = str.Replace(" ", "");
-            str = str.Replace(".", "");
-            str = str.Replace("。", "");
-            str = str.Replace(",", "");
+            string str = startmsg.Replace("#游戏开启", "");
             long qqgroup = 0;
             if (long.TryParse(str, out qqgroup))
             {
@@ -304,30 +327,42 @@ namespace com.Doge.GroupGame.Plugin
                         {
                             //获取群成员 需要api权限160
                             List<GroupMemberInfo> memebers = CoolQApi.GetGroupMemberList(qqgroup).Model.ToList();
-                            if (!m_QQdics.ContainsKey(qqgroup))
+                            var game = m_GameList.FirstOrDefault(t => t.QQGroup == qqgroup);
+                            if (game == null)
                             {
-                                m_QQdics.Add(qqgroup, memebers.Select(t => t.Number).ToList());
+                                game = new Game() { QQGroup = qqgroup };
+                                m_GameList.Add(game);
                             }
-                            else
-                            {
-                                m_QQdics[qqgroup] = memebers.Select(t => t.Number).ToList();
-                            }
+                            game.Players = SqliteHelper.Instance.GetPlayersFromDb(qqgroup);
 
-                            foreach (var gameqq in m_QQdics[qqgroup])
+                            List<Player> newadd = new List<Player>();
+                            foreach (var member in memebers)
                             {
-                                CoolQApi.SetGroupSpecialTitle(qqgroup, gameqq, m_LevelDic[1], -1);
+                                var player = game.Players.FirstOrDefault(t => t.QQ == member.Number);
+                                if (player == null)
+                                {
+                                    player = new Player()
+                                    {
+                                        QQ = member.Number,
+                                        Level = 1,
+                                        State = 0
+                                    };
+                                    newadd.Add(player);
+                                    game.Players.Add(player);
+                                }
                             }
+                            SqliteHelper.Instance.UpdatePlayers(qqgroup, newadd);
 
                         }
                         catch (Exception ee)
                         {
-                            CoolQApi.AddLog(1, CoolQLogLevel.Error, "设置qq成员等级失败。原因：" + ee.Message);
+                            CoolQApi.AddLog(1, CoolQLogLevel.Error, "获取群成员玩家信息失败。原因：" + ee.Message);
                         }
                     };
 
                     newBackgroundWorker.RunWorkerCompleted += (sender, args) =>
                     {
-                        CoolQApi.SendPrivateMsg(fromqq, "设置qq成员等级完成！");
+                        CoolQApi.SendPrivateMsg(fromqq, "获取群成员玩家信息完成！");
                     };
 
                     RunWorkerCompletedEventHandler GetLevelDictionaryFinished = (sender, args) =>
@@ -382,35 +417,113 @@ namespace com.Doge.GroupGame.Plugin
             object[] paramaters = (object[])obj;
             long fromqq = (long)paramaters[0];
             string msg = paramaters[1].ToString();
+            long fromgroup = (long)paramaters[2];
 
-            if (msg.Contains("查询等级名称"))
+            if (msg.Contains("#查询等级名称"))
             {
-                string str = msg.Replace("查询等级名称", "");
-                str = str.Replace("级", "");
-                str = str.Replace(".", "");
-                str = str.Replace("。", "");
-                str = str.Replace(",", "");
-
-                int level = 0;
-                if (int.TryParse(str, out level))
+                string str = msg.Replace("#查询等级名称", "");
+                if (string.IsNullOrWhiteSpace(str))
                 {
                     string ans = "";
-                    if (m_LevelDic != null && m_LevelDic.ContainsKey(level))
+                    if (m_LevelDic != null)
                     {
-                        ans = m_LevelDic[level];
+                        foreach (var level in m_LevelDic.Keys)
+                        {
+                            ans += string.Format("第{0}级 {1}\r\n",level,m_LevelDic[level]) ;
+                        }
                         if (!string.IsNullOrWhiteSpace(ans))
                         {
-                            CoolQApi.SendPrivateMsg(fromqq, ans);
+                            CoolQApi.SendGroupMsg(fromgroup, ans);
                         }
+                    }
+
+                }
+                else
+                {
+                    str = str.Replace("级", "");
+                    str = str.Replace(".", "");
+                    str = str.Replace("。", "");
+                    str = str.Replace(",", "");
+                    str = str.Trim();
+                    int level = 0;
+                    if (int.TryParse(str, out level))
+                    {
+                        string ans = "";
+                        if (m_LevelDic != null && m_LevelDic.ContainsKey(level))
+                        {
+                            ans = m_LevelDic[level];
+                            if (!string.IsNullOrWhiteSpace(ans))
+                            {
+                                CoolQApi.SendGroupMsg(fromgroup, ans);
+                            }
+                        }
+                    }
+                }
+
+
+            }
+        }
+
+        private void AskForLevelDescriptionThread(long fromqq, string msg,long fromgroup)
+        {
+            object[] paramaters = new object[] { fromqq, msg,fromgroup};
+            Thread mainThread = new Thread(new ParameterizedThreadStart(AskForLevelDescription));
+            mainThread.Start(paramaters);
+        }
+
+        /// <summary>
+        /// 获取玩家信息
+        /// </summary>
+        /// <param name="obj"></param>
+        public void GetPlayerInfo(object obj)
+        {
+            object[] paramaters = (object[])obj;
+            long groupqq = (long)paramaters[0];
+            string msg = paramaters[1].ToString();
+            long fromqq = (long)paramaters[2];
+
+            if (msg.Contains("#查询信息"))
+            {
+                var game = m_GameList.FirstOrDefault(t => t.QQGroup == groupqq);
+                if (game != null)
+                {
+                    var qqlist = CheckHasAtQQ(game.Players.Select(t => t.QQ).ToList(), msg);
+                    if (qqlist != null && qqlist.Count > 0)
+                    {
+                        long targetqq = qqlist[0];
+                        var player = game.Players.FirstOrDefault(t => t.QQ == targetqq);
+                        if (player != null)
+                        {
+                            string ans = "玩家" + CoolQCode.At(targetqq) + "等级 ：" + m_LevelDic[player.Level] + "  状态：" + (player.State == 0 ? "正常" : "死亡");
+                            CoolQApi.SendGroupMsg(groupqq, ans);
+                        }
+                    }
+                }
+            }
+            if (msg.Contains("#查询我的信息"))
+            {
+                var game = m_GameList.FirstOrDefault(t => t.QQGroup == groupqq);
+                if (game != null)
+                {
+                    var player = game.Players.FirstOrDefault(t => t.QQ == fromqq);
+                    if (player != null)
+                    {
+                        string ans = "玩家" + CoolQCode.At(fromqq) + "等级 ：" + m_LevelDic[player.Level] + "  状态：" + (player.State == 0 ? "正常" : "死亡");
+                        CoolQApi.SendGroupMsg(groupqq, ans);
                     }
                 }
             }
         }
 
-        private void AskForLevelDescriptionThread(long fromqq, string msg)
+        /// <summary>
+        /// 获取玩家信息进程
+        /// </summary>
+        /// <param name="groupqq"></param>
+        /// <param name="msg"></param>
+        private void GetPlayerInfoThread(long groupqq, string msg, long fromqq)
         {
-            object[] paramaters = new object[] { fromqq, msg };
-            Thread mainThread = new Thread(new ParameterizedThreadStart(AskForLevelDescription));
+            object[] paramaters = new object[] { groupqq, msg, fromqq };
+            Thread mainThread = new Thread(new ParameterizedThreadStart(GetPlayerInfo));
             mainThread.Start(paramaters);
         }
 

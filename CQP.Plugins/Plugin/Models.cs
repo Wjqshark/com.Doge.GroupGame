@@ -49,4 +49,11 @@ namespace com.Doge.GroupGame.Plugin
         /// </summary>
         Dead = 1
     }
+
+
+    public class Game
+    {
+        public List<Player> Players { get; set; }
+        public long QQGroup { get; set; }
+    }
 }

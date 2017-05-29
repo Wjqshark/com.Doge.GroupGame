@@ -86,6 +86,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Database\SqliteHelper.cs" />
+    <Compile Include="Plugin\GamePlaying.cs" />
     <Compile Include="Plugin\MainPlugin.cs" />
     <Compile Include="Plugin\Models.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
