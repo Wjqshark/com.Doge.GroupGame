@@ -15,6 +15,8 @@ namespace com.Doge.GroupGame.Plugin
         /// QQ
         /// </summary>
         public long QQ { get; set; }
+
+        public string Name { get; set; }
         /// <summary>
         /// 等级
         /// </summary>
@@ -30,7 +32,22 @@ namespace com.Doge.GroupGame.Plugin
         {
             get
             {
-                return Level * 20 + 30;
+                return Level * 10 + 40;
+            }
+        }
+
+        public int MaxAttack
+        {
+            get
+            {
+                return Level * 3 + 7;
+            }
+        }
+        public int MinAttack
+        {
+            get
+            {
+                return Level + 5;
             }
         }
     }
@@ -56,4 +73,55 @@ namespace com.Doge.GroupGame.Plugin
         public List<Player> Players { get; set; }
         public long QQGroup { get; set; }
     }
+    /// <summary>
+    /// 战斗细节
+    /// </summary>
+    public class BattleInfo
+    {
+        /// <summary>
+        /// 攻击方
+        /// </summary>
+        public Player playerA { get; set; }
+        /// <summary>
+        /// 受攻击方
+        /// </summary>
+        public Player playerB { get; set; }
+        /// <summary>
+        /// 攻击类型
+        /// </summary>
+        public int BattleType { get; set; }
+        /// <summary>
+        /// 伤害量
+        /// </summary>
+        public int Damage { get; set; }
+        /// <summary>
+        /// 战斗描述
+        /// </summary>
+        public string BattleDescription { get; set; }
+    }
+
+    /// <summary>
+    /// 战斗结果
+    /// </summary>
+    public class BattleResult
+    {
+        /// <summary>
+        /// 胜者
+        /// </summary>
+        public Player Winner { get; set; }
+        /// <summary>
+        /// 败者
+        /// </summary>
+        public Player Loser { get; set; }
+        /// <summary>
+        /// 战斗细节
+        /// </summary>
+        public List<BattleInfo> BattleInfos { get; set; }
+        /// <summary>
+        /// 战斗描述
+        /// </summary>
+        public string BattleDescription { get; set; }
+
+    }
+
 }

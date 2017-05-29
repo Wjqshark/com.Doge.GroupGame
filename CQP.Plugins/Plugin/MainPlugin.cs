@@ -81,6 +81,10 @@ namespace com.Doge.GroupGame.Plugin
                     {
                         AskForLevelDescriptionThread(fromQq, msg, fromGroup);
                     }
+                    else if (msg.Contains("攻击") || msg.Contains("战斗"))
+                    {
+                        BattleThread(fromGroup, msg, fromQq);
+                    }
                     SetBusy();
                     return 1;
                 }
@@ -183,43 +187,6 @@ namespace com.Doge.GroupGame.Plugin
         }
 
         /// <summary>
-        /// 开启处理群消息进程
-        /// </summary>
-        /// <param name="subType"></param>
-        /// <param name="sendTime"></param>
-        /// <param name="fromGroup"></param>
-        /// <param name="fromQq"></param>
-        /// <param name="fromAnonymous"></param>
-        /// <param name="msg"></param>
-        /// <param name="font"></param>
-        private void DealWithGroupMessageThread(int subType, int sendTime, long fromGroup, long fromQq, string fromAnonymous, string msg, int font)
-        {
-            object[] paramaters = new object[] { subType, sendTime, fromGroup, fromQq, fromAnonymous, msg, font };
-            Thread mainThread = new Thread(new ParameterizedThreadStart(DealWithGroupMessage));
-            mainThread.Start(paramaters);
-        }
-        /// <summary>
-        /// 处理群消息方法
-        /// </summary>
-        /// <param name="obj"></param>
-        private void DealWithGroupMessage(object obj)
-        {
-            try
-            {
-                object[] paramaters = (object[])obj;
-                long fromGroup = (long)paramaters[2];
-                long fromQq = (long)paramaters[3];
-                string msg = (string)paramaters[5];
-
-            }
-            catch (Exception e)
-            {
-                CoolQApi.AddLog(1, CoolQLogLevel.Error, e.Message);
-            }
-
-        }
-
-        /// <summary>
         /// 更新QQ列表进程
         /// </summary>
         /// <param name="groupqq"></param>
@@ -255,8 +222,14 @@ namespace com.Doge.GroupGame.Plugin
                         {
                             Level = 1,
                             QQ = newqq,
-                            State = 0
+                            State = 0,
                         };
+                    }
+
+                    var modelsource = CoolQApi.GetGroupMemberInfoV2(groupQQ, newqq, true);
+                    if (modelsource != null && modelsource.Model != null)
+                    {
+                        player.Name = modelsource.Model.NickName;
                     }
                     game.Players.Add(player);
                     SqliteHelper.Instance.UpdatePlayers(groupQQ, game.Players);
@@ -344,11 +317,16 @@ namespace com.Doge.GroupGame.Plugin
                                     player = new Player()
                                     {
                                         QQ = member.Number,
+                                        Name = member.NickName,
                                         Level = 1,
                                         State = 0
                                     };
                                     newadd.Add(player);
                                     game.Players.Add(player);
+                                }
+                                else
+                                {
+                                    player.Name = member.NickName;
                                 }
                             }
                             SqliteHelper.Instance.UpdatePlayers(qqgroup, newadd);
@@ -429,7 +407,7 @@ namespace com.Doge.GroupGame.Plugin
                     {
                         foreach (var level in m_LevelDic.Keys)
                         {
-                            ans += string.Format("第{0}级 {1}\r\n",level,m_LevelDic[level]) ;
+                            ans += string.Format("第{0}级 {1}\r\n", level, m_LevelDic[level]);
                         }
                         if (!string.IsNullOrWhiteSpace(ans))
                         {
@@ -464,9 +442,9 @@ namespace com.Doge.GroupGame.Plugin
             }
         }
 
-        private void AskForLevelDescriptionThread(long fromqq, string msg,long fromgroup)
+        private void AskForLevelDescriptionThread(long fromqq, string msg, long fromgroup)
         {
-            object[] paramaters = new object[] { fromqq, msg,fromgroup};
+            object[] paramaters = new object[] { fromqq, msg, fromgroup };
             Thread mainThread = new Thread(new ParameterizedThreadStart(AskForLevelDescription));
             mainThread.Start(paramaters);
         }
@@ -526,6 +504,57 @@ namespace com.Doge.GroupGame.Plugin
             Thread mainThread = new Thread(new ParameterizedThreadStart(GetPlayerInfo));
             mainThread.Start(paramaters);
         }
+
+        /// <summary>
+        /// 战斗方法
+        /// </summary>
+        /// <param name="obj"></param>
+        public void Battle(object obj)
+        {
+            object[] paramaters = (object[])obj;
+            long groupqq = (long)paramaters[0];
+            string msg = paramaters[1].ToString();
+            long fromqq = (long)paramaters[2];
+
+            if (msg.Contains("攻击") || msg.Contains("战斗"))
+            {
+                var game = m_GameList.FirstOrDefault(t => t.QQGroup == groupqq);
+                if (game != null)
+                {
+                    var qqlist = CheckHasAtQQ(game.Players.Select(t => t.QQ).ToList(), msg);
+                    if (qqlist != null && qqlist.Count > 0)
+                    {
+                        long targetqq = qqlist[0];
+                        var player1 = game.Players.FirstOrDefault(t => t.QQ == fromqq);
+                        var player2 = game.Players.FirstOrDefault(t => t.QQ == targetqq);
+                        if (player1 != null && player2 != null)
+                        {
+                            var result = GamePlaying.Battle(player1, player2,m_LevelDic);
+
+
+
+                            string outmsg = result.BattleDescription.Replace("AAA", player1.Name);
+                            outmsg = outmsg.Replace("BBB", player2.Name);
+                            CoolQApi.SendGroupMsg(groupqq, outmsg);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 战斗进程
+        /// </summary>
+        /// <param name="groupqq"></param>
+        /// <param name="msg"></param>
+        /// <param name="fromqq"></param>
+        private void BattleThread(long groupqq, string msg, long fromqq)
+        {
+            object[] paramaters = new object[] { groupqq, msg, fromqq };
+            Thread mainThread = new Thread(new ParameterizedThreadStart(Battle));
+            mainThread.Start(paramaters);
+        }
+
 
 
 
