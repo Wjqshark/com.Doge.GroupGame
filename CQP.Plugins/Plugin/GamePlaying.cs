@@ -11,18 +11,28 @@ namespace com.Doge.GroupGame.Plugin
     /// </summary>
     public static class GamePlaying
     {
+
+        #region property
         /// <summary>
         /// 随机数生成
         /// </summary>
         private static Random m_Rand = new Random();
 
         /// <summary>
+        /// 等级描述字典
+        /// </summary>
+        public static Dictionary<int, string> LevelDic = new Dictionary<int, string>();
+
+        #endregion
+
+        #region Method
+
+        /// <summary>
         /// 战斗进程
         /// </summary>
         /// <param name="fap">先攻选手</param>
         /// <param name="sap">后攻选手</param>
-        /// <param name="levelDictionary">等级词典</param>
-        public static BattleResult Battle(Player fap, Player sap, Dictionary<int, string> levelDictionary)
+        public static BattleResult Battle(Player fap, Player sap)
         {
             BattleResult result = new BattleResult();
             //双方血量
@@ -37,7 +47,7 @@ namespace com.Doge.GroupGame.Plugin
 
             result.BattleInfos = new List<BattleInfo>();
 
-            result.BattleDescription = $"先攻方： {fap.Name}  等级：{levelDictionary[fap.Level]} \r\n后攻方： {sap.Name} 等级：{levelDictionary[sap.Level]}\r\n";
+            result.BattleDescription = $"先攻方： {fap.Name}  等级：[{fap.Level}]{LevelDic[fap.Level]} \r\n后攻方： {sap.Name} 等级：[{sap.Level}]{LevelDic[sap.Level]}\r\n";
 
             while (fapHP > 0 && sapHP > 0 && round < 20)
             {
@@ -80,20 +90,20 @@ namespace com.Doge.GroupGame.Plugin
             {
                 result.Winner = fap;
                 result.Loser = sap;
-                result.BattleDescription += $"{result.Winner.Name}击败了{result.Loser.Name}";
+                result.BattleDescription += $"{result.Winner.Name}击败了{result.Loser.Name}！";
             }
             else if (fapHP <= 0)
             {
                 result.Winner = sap;
                 result.Loser = fap;
-                result.BattleDescription += $"{result.Winner.Name}击败了{result.Loser.Name}";
+                result.BattleDescription += $"{result.Winner.Name}击败了{result.Loser.Name}！";
             }
             //平局
             else if (round >= 20)
             {
                 result.Winner = null;
                 result.Loser = null;
-                result.BattleDescription += $"双方并未分出胜负";
+                result.BattleDescription += $"双方并未分出胜负！";
             }
             return result;
 
@@ -194,6 +204,119 @@ namespace com.Doge.GroupGame.Plugin
             battleInfo.BattleDescription = $"{p1}向{p2}发起攻击！{p2}受到{battleInfo.Damage}点伤害。";
             return battleInfo;
         }
+
+        /// <summary>
+        /// 判定升级
+        /// </summary>
+        /// <param name="currentlevel">当前等级</param>
+        /// <param name="defeatEnemyLevel">击败敌人等级</param>
+        /// <param name="newlevel">新等级</param>
+        /// <returns></returns>
+        public static bool LevelUp(int currentlevel, int defeatEnemyLevel, out int newlevel)
+        {
+            bool result = false;
+            newlevel = currentlevel;
+            //当击败超过自己等级的对手
+            if (defeatEnemyLevel >= currentlevel)
+            {
+                //难度等级
+                int hardlevel = defeatEnemyLevel - currentlevel;
+                if (hardlevel >= 3)
+                {
+                    //难度等级超过10，直接升5级
+                    if (hardlevel >= 10)
+                    {
+                        newlevel = currentlevel + 5;
+                        result = true;
+                    }
+                    //难度等级超过5，直接升3级
+                    else if (hardlevel >= 5)
+                    {
+                        newlevel = currentlevel + 3;
+                        result = true;
+                    }
+                    //难度等级超过3，直接升1级
+                    else
+                    {
+                        newlevel = currentlevel + 1;
+                        result = true;
+                    }
+                }
+                else
+                {
+                    //当前等级小于20级
+                    if (currentlevel < 20)
+                    {
+                        //升级几率（92-当前等级*4）
+                        int plvup = 92 - currentlevel * 4;
+                        int rlvup = m_Rand.Next(100);
+                        if (rlvup <= plvup)
+                        {
+                            newlevel = currentlevel + 1;
+                            result = true;
+                        }
+                    }
+                    //当前等级超过或等于20级
+                    else
+                    {
+                        int rlvup = m_Rand.Next(1000);
+                        //升级几率（千分之 2*（26-等级））
+                        if (rlvup < 2 * (26 - currentlevel))
+                        {
+                            newlevel = currentlevel + 1;
+                            result = true;
+                        }
+                    }
+                }
+            }
+            //当击败等级低于自己的对手
+            else
+            {
+                //碾压等级
+                int crashlevel = currentlevel - defeatEnemyLevel;
+                //碾压等级超过3
+                if (crashlevel >= 3)
+                {
+                    //当前等级小于20级
+                    if (currentlevel < 20)
+                    {
+                        int rlvup = m_Rand.Next(100);
+                        if (rlvup < 3)
+                        {
+                            newlevel = currentlevel + 1;
+                            result = true;
+                        }
+                    }
+                    //当前等级超过或等于20级
+                    else
+                    {
+                        int rlvup = m_Rand.Next(1000);
+                        //升级几率（千分之（26-等级））
+                        if (rlvup < 26 - currentlevel)
+                        {
+                            newlevel = currentlevel + 1;
+                            result = true;
+                        }
+                    }
+
+                }
+                else
+                {
+                    int plvup = 84 - currentlevel * 4;
+                    int rlvup = m_Rand.Next(100);
+                    if (rlvup <= plvup)
+                    {
+                        newlevel = currentlevel + 1;
+                        result = true;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+
+        #endregion
 
     }
 }

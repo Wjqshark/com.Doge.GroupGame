@@ -30,14 +30,6 @@ namespace com.Doge.GroupGame.Plugin
         /// </summary>
         private List<Game> m_GameList = new List<Game>();
 
-        /// <summary>
-        /// 开启qq群列表
-        /// </summary>
-        private List<long> m_StartQQGroupList = new List<long>();
-        /// <summary>
-        /// 等级描述字典
-        /// </summary>
-        private Dictionary<int, string> m_LevelDic = new Dictionary<int, string>();
 
         #endregion
 
@@ -47,6 +39,10 @@ namespace com.Doge.GroupGame.Plugin
 
         System.Timers.Timer m_Timer = new System.Timers.Timer(300);
 
+        /// <summary>
+        /// 保存数据库timer 20分钟保存一次游戏数据
+        /// </summary>
+        System.Timers.Timer m_SaveGameTimer = new System.Timers.Timer(1200000);
         #endregion
 
 
@@ -69,31 +65,36 @@ namespace com.Doge.GroupGame.Plugin
         /// <returns></returns>
         public override int ProcessGroupMessage(int subType, int sendTime, long fromGroup, long fromQq, string fromAnonymous, string msg, int font)
         {
-            if (m_GameList.Exists(t => t.QQGroup == fromGroup))
+            try
             {
-                if (msg.StartsWith("#") && m_flag == false)
+                if (m_GameList.Exists(t => t.QQGroup == fromGroup))
                 {
-                    if (msg.Contains("#查询信息") || msg.Contains("#查询我的信息"))
+                    if (msg.StartsWith("#") && m_flag == false)
                     {
-                        GetPlayerInfoThread(fromGroup, msg, fromQq);
+                        if (msg.Contains("#查询信息") || msg.Contains("#查询我的信息"))
+                        {
+                            GetPlayerInfoThread(fromGroup, msg, fromQq);
+                        }
+                        else if (msg.Contains("#查询等级名称"))
+                        {
+                            AskForLevelDescriptionThread(fromQq, msg, fromGroup);
+                        }
+                        else if (msg.Contains("攻击") || msg.Contains("战斗"))
+                        {
+                            BattleThread(fromGroup, msg, fromQq);
+                        }
+                        SetBusy();
+                        return 1;
                     }
-                    else if (msg.Contains("#查询等级名称"))
-                    {
-                        AskForLevelDescriptionThread(fromQq, msg, fromGroup);
-                    }
-                    else if (msg.Contains("攻击") || msg.Contains("战斗"))
-                    {
-                        BattleThread(fromGroup, msg, fromQq);
-                    }
-                    SetBusy();
-                    return 1;
                 }
-                //else if()
-                //{
-
-                //}
+                return base.ProcessGroupMessage(subType, sendTime, fromGroup, fromQq, fromAnonymous, msg, font);
             }
-            return base.ProcessGroupMessage(subType, sendTime, fromGroup, fromQq, fromAnonymous, msg, font);
+            catch (Exception ee)
+            {
+                CoolQApi.AddLog(1, CoolQLogLevel.Error, "接收群消息失败。原因：" + ee.Message);
+                return base.ProcessGroupMessage(subType, sendTime, fromGroup, fromQq, fromAnonymous, msg, font);
+            }
+
         }
 
 
@@ -123,17 +124,33 @@ namespace com.Doge.GroupGame.Plugin
         /// <returns></returns>
         public override int ProcessPrivateMessage(int subType, int sendTime, long fromQq, string msg, int font)
         {
-            if (msg.StartsWith("#") && m_flag == false)
+            try
             {
-                if (msg.Contains("#游戏开启") && fromQq == 719539302)
+                if (msg.StartsWith("#") && m_flag == false)
                 {
-                    StartGameThread(msg, fromQq);
+                    if (msg.Contains("#游戏开启") && fromQq == 719539302)
+                    {
+                        StartGameThread(msg, fromQq);
+                    }
+                    else if (msg.Contains("#游戏关闭") && fromQq == 719539302)
+                    {
+                        StopGameThread(msg, fromQq);
+                    }
+                    else if (msg.Contains("#保存游戏") && fromQq == 719539302)
+                    {
+                        SaveGameThread(msg, fromQq);
+                    }
+                    SetBusy();
+                    return 1;
                 }
-                SetBusy();
-                return 1;
+                return base.ProcessPrivateMessage(subType, sendTime, fromQq, msg, font);
+            }
+            catch (Exception ee)
+            {
+                CoolQApi.AddLog(1, CoolQLogLevel.Error, "接收私聊消息失败。原因：" + ee.Message);
+                return base.ProcessPrivateMessage(subType, sendTime, fromQq, msg, font);
             }
 
-            return base.ProcessPrivateMessage(subType, sendTime, fromQq, msg, font);
         }
 
 
@@ -241,14 +258,6 @@ namespace com.Doge.GroupGame.Plugin
         }
 
         /// <summary>
-        /// 连接数据库
-        /// </summary>
-        private void ConnectDb()
-        {
-            SqliteHelper.Instance.ConnectToDatabase("D://GameDb.sqlite");
-        }
-
-        /// <summary>
         /// 开启进程
         /// </summary>
         /// <param name="method"></param>
@@ -290,10 +299,33 @@ namespace com.Doge.GroupGame.Plugin
             if (long.TryParse(str, out qqgroup))
             {
                 string ans = "";
-                if (!m_StartQQGroupList.Contains(qqgroup))
+                if (!m_GameList.Exists(t => t.QQGroup == qqgroup))
                 {
-
                     BackgroundWorker newBackgroundWorker = new BackgroundWorker();
+                    RunWorkerCompletedEventHandler GetLevelDictionaryFinished = (sender, args) =>
+                    {
+                        CoolQApi.SendPrivateMsg(fromqq, "级别字典加载完成！");
+                        newBackgroundWorker.RunWorkerAsync();
+                    };
+
+                    BackgroundWorker getConnectionworker = new BackgroundWorker();
+                    getConnectionworker.DoWork += (sender, e) =>
+                    {
+                        string path = CoolQApi.GetAppDirectory();
+                        string dbpath = path.Replace(@"酷Q Pro\app\com.doge.groupgame\", @"酷Q Pro\com.Doge.GroupGame\GameDb.sqlite");
+                        //string dbpath = System.IO.Path.Combine(path, "com.Doge.GroupGame", "GameDb.sqlite");
+                        SqliteHelper.Instance.SetDBUrl(@dbpath);
+                        e.Result = dbpath;
+                    };
+                    getConnectionworker.RunWorkerCompleted += (sender, args) =>
+                    {
+                        string dbstr = args.Result.ToString();
+                        CoolQApi.SendPrivateMsg(fromqq, "数据库字段匹配完毕！连接为 ：" + dbstr);
+                        SaveGame(qqgroup);
+                        CoolQApi.SendPrivateMsg(fromqq, "保存当前qq群游戏数据" + dbstr);
+                        GetLevelDictionary(GetLevelDictionaryFinished);
+                    };
+
                     newBackgroundWorker.DoWork += (sender, args) =>
                     {
                         try
@@ -341,14 +373,16 @@ namespace com.Doge.GroupGame.Plugin
                     newBackgroundWorker.RunWorkerCompleted += (sender, args) =>
                     {
                         CoolQApi.SendPrivateMsg(fromqq, "获取群成员玩家信息完成！");
+                        AutoSaveGameStart();
+                        CoolQApi.SendPrivateMsg(fromqq, "已开启自动保存！");
                     };
 
-                    RunWorkerCompletedEventHandler GetLevelDictionaryFinished = (sender, args) =>
-                    {
-                        CoolQApi.SendPrivateMsg(fromqq, "级别字典加载完成！");
-                        newBackgroundWorker.RunWorkerAsync();
-                    };
-                    GetLevelDictionary(GetLevelDictionaryFinished);
+
+
+
+
+
+                    getConnectionworker.RunWorkerAsync();
                 }
             }
         }
@@ -365,7 +399,7 @@ namespace com.Doge.GroupGame.Plugin
             {
                 try
                 {
-                    m_LevelDic = SqliteHelper.Instance.GetLevelsName();
+                    GamePlaying.LevelDic = SqliteHelper.Instance.GetLevelsName();
                 }
                 catch (Exception ee)
                 {
@@ -373,10 +407,6 @@ namespace com.Doge.GroupGame.Plugin
                 }
 
             };
-            //bgBackgroundWorker.RunWorkerCompleted += (sender, args) =>
-            //{
-            //CoolQApi.SendPrivateMsg(fromqq, "级别字典加载完成！");
-            //};
             if (finishHandler != null)
             {
                 bgBackgroundWorker.RunWorkerCompleted += finishHandler;
@@ -403,11 +433,11 @@ namespace com.Doge.GroupGame.Plugin
                 if (string.IsNullOrWhiteSpace(str))
                 {
                     string ans = "";
-                    if (m_LevelDic != null)
+                    if (GamePlaying.LevelDic != null)
                     {
-                        foreach (var level in m_LevelDic.Keys)
+                        foreach (var level in GamePlaying.LevelDic.Keys)
                         {
-                            ans += string.Format("第{0}级 {1}\r\n", level, m_LevelDic[level]);
+                            ans += string.Format("第{0}级 {1}\r\n", level, GamePlaying.LevelDic[level]);
                         }
                         if (!string.IsNullOrWhiteSpace(ans))
                         {
@@ -427,9 +457,9 @@ namespace com.Doge.GroupGame.Plugin
                     if (int.TryParse(str, out level))
                     {
                         string ans = "";
-                        if (m_LevelDic != null && m_LevelDic.ContainsKey(level))
+                        if (GamePlaying.LevelDic != null && GamePlaying.LevelDic.ContainsKey(level))
                         {
-                            ans = m_LevelDic[level];
+                            ans = GamePlaying.LevelDic[level];
                             if (!string.IsNullOrWhiteSpace(ans))
                             {
                                 CoolQApi.SendGroupMsg(fromgroup, ans);
@@ -472,7 +502,7 @@ namespace com.Doge.GroupGame.Plugin
                         var player = game.Players.FirstOrDefault(t => t.QQ == targetqq);
                         if (player != null)
                         {
-                            string ans = "玩家" + CoolQCode.At(targetqq) + "等级 ：" + m_LevelDic[player.Level] + "  状态：" + (player.State == 0 ? "正常" : "死亡");
+                            string ans = "玩家" + CoolQCode.At(targetqq) + "  等级 ：[" + player.Level + "]" + GamePlaying.LevelDic[player.Level] + "  状态：" + (player.State == 0 ? "正常" : "死亡");
                             CoolQApi.SendGroupMsg(groupqq, ans);
                         }
                     }
@@ -486,7 +516,7 @@ namespace com.Doge.GroupGame.Plugin
                     var player = game.Players.FirstOrDefault(t => t.QQ == fromqq);
                     if (player != null)
                     {
-                        string ans = "玩家" + CoolQCode.At(fromqq) + "等级 ：" + m_LevelDic[player.Level] + "  状态：" + (player.State == 0 ? "正常" : "死亡");
+                        string ans = "玩家" + CoolQCode.At(fromqq) + "  等级 ：[" + player.Level + "]" + GamePlaying.LevelDic[player.Level] + "  状态 ：" + (player.State == 0 ? "正常" : "死亡");
                         CoolQApi.SendGroupMsg(groupqq, ans);
                     }
                 }
@@ -529,12 +559,23 @@ namespace com.Doge.GroupGame.Plugin
                         var player2 = game.Players.FirstOrDefault(t => t.QQ == targetqq);
                         if (player1 != null && player2 != null)
                         {
-                            var result = GamePlaying.Battle(player1, player2,m_LevelDic);
-
-
-
-                            string outmsg = result.BattleDescription.Replace("AAA", player1.Name);
+                            //获取胜负结果
+                            var battleresult = GamePlaying.Battle(player1, player2);
+                            //人名替换
+                            string outmsg = battleresult.BattleDescription.Replace("AAA", player1.Name);
                             outmsg = outmsg.Replace("BBB", player2.Name);
+                            //判断升级
+                            if (battleresult.Winner != null && battleresult.Loser != null)
+                            {
+                                int newlevel = 0;
+                                if (GamePlaying.LevelUp(battleresult.Winner.Level, battleresult.Loser.Level,
+                                    out newlevel))
+                                {
+                                    battleresult.Winner.Level = newlevel;
+                                    outmsg += $"\n\n{battleresult.Winner.Name}升级了！，达到了[{battleresult.Winner.Level}]{GamePlaying.LevelDic[battleresult.Winner.Level]}！";
+                                }
+
+                            }
                             CoolQApi.SendGroupMsg(groupqq, outmsg);
                         }
                     }
@@ -556,7 +597,112 @@ namespace com.Doge.GroupGame.Plugin
         }
 
 
+        /// <summary>
+        /// 停止游戏设置进程
+        /// </summary>
+        /// <param name="startmsg"></param>
+        /// <param name="fromqq"></param>
+        private void StopGameThread(string endmsg, long fromqq)
+        {
+            object[] paramaters = new object[] { fromqq, endmsg };
+            Thread mainThread = new Thread(new ParameterizedThreadStart(StopGame));
+            mainThread.Start(paramaters);
+        }
+        /// <summary>
+        /// 停止游戏
+        /// </summary>
+        /// <param name="obj"></param>
+        private void StopGame(object obj)
+        {
+            object[] paramaters = (object[])obj;
+            long fromqq = (long)paramaters[0];
+            string msg = paramaters[1].ToString();
+            if (fromqq == 719539302 && msg.Contains("#游戏关闭"))
+            {
+                string str = msg.Replace("#游戏关闭", "");
+                long qqgroup = 0;
+                if (long.TryParse(str, out qqgroup))
+                {
+                    StopGame(qqgroup);
+                }
+            }
 
+        }
+
+        /// <summary>
+        /// 停止游戏
+        /// </summary>
+        /// <param name="groupqq"></param>
+        private void StopGame(long groupqq)
+        {
+            var game = m_GameList.FirstOrDefault(t => t.QQGroup == groupqq);
+            m_GameList.Remove(game);
+            CoolQApi.SendPrivateMsg(719539302, $"{game.QQGroup}群游戏已经停止！");
+        }
+
+
+        /// <summary>
+        /// 保存游戏进程
+        /// </summary>
+        /// <param name="msg"></param>
+        /// <param name="fromqq"></param>
+        private void SaveGameThread(string msg, long fromqq)
+        {
+            object[] paramaters = new object[] { fromqq, msg };
+            Thread mainThread = new Thread(new ParameterizedThreadStart(SaveGame));
+            mainThread.Start(paramaters);
+        }
+        /// <summary>
+        /// 保存游戏
+        /// </summary>
+        /// <param name="obj"></param>
+        private void SaveGame(object obj)
+        {
+            object[] paramaters = (object[])obj;
+            long fromqq = (long)paramaters[0];
+            string msg = paramaters[1].ToString();
+            if (fromqq == 719539302 && msg.Contains("#保存游戏"))
+            {
+                string str = msg.Replace("#保存游戏", "");
+                long qqgroup = 0;
+                if (long.TryParse(str, out qqgroup))
+                {
+                    SaveGame(qqgroup);
+                }
+            }
+
+        }
+
+
+        /// <summary>
+        /// 保存游戏
+        /// </summary>
+        /// <param name="groupqq"></param>
+        private void SaveGame(long groupqq)
+        {
+            var game = m_GameList.FirstOrDefault(t => t.QQGroup == groupqq);
+            if (game != null)
+            {
+                SqliteHelper.Instance.UpdatePlayers(groupqq, game.Players);
+                CoolQApi.SendPrivateMsg(719539302, $"{game.QQGroup}群的数据已经保存！");
+            }
+        }
+
+        /// <summary>
+        /// 自动保存
+        /// </summary>
+        private void AutoSaveGameStart()
+        {
+            m_SaveGameTimer.Elapsed += (sender, args) =>
+            {
+                foreach (var game in m_GameList)
+                {
+                    SaveGame(game.QQGroup);
+                    CoolQApi.SendPrivateMsg(719539302, $"{game.QQGroup}群的数据已经保存！");
+                }
+            };
+            m_SaveGameTimer.Start();
+        }
 
 
         #endregion

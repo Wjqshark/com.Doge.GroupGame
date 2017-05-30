@@ -38,28 +38,22 @@ namespace com.Doge.GroupGame.Database
 
         private string m_DbUrl = @"D://GameDb.sqlite";
 
-        public void CreateNewDatabase(string dbName)
+        /// <summary>
+        /// 设置连接串
+        /// </summary>
+        /// <param name="str"></param>
+        public void SetDBUrl(string str)
         {
-            //SQLiteConnection.CreateFile("MyDatabase.sqlite");
-            SQLiteConnection.CreateFile(dbName);
-            string constr = $"Data Source={dbName};";
-            m_DbConnection = new SQLiteConnection(constr);
-            m_DbConnection.Open();
-        }
-
-
-        public void ConnectToDatabase(string dbName)
-        {
-            //m_dbConnection = new SQLiteConnection("Data Source=MyDatabase.sqlite;");
-            //m_dbConnection.Open();
-            string constr = $"Data Source={dbName};";
-            m_DbConnection = new SQLiteConnection(constr);
-            m_DbConnection.Open();
+            m_DbUrl = str;
         }
 
 
         #region Sql查询
 
+        /// <summary>
+        /// 获取等级名称
+        /// </summary>
+        /// <returns></returns>
         public Dictionary<int, string> GetLevelsName()
         {
             Dictionary<int, string> dictionary = new Dictionary<int, string>();
