@@ -15,16 +15,29 @@ namespace com.Doge.GroupGame.Plugin
         /// QQ
         /// </summary>
         public long QQ { get; set; }
-
+        /// <summary>
+        /// 名字
+        /// </summary>
         public string Name { get; set; }
         /// <summary>
         /// 等级
         /// </summary>
         public int Level { get; set; }
         /// <summary>
-        /// 状态
+        /// 状态  0 正常，1轻伤，2重伤，9修炼中
         /// </summary>
         public int State { get; set; }
+
+        /// <summary>
+        /// 活力值
+        /// </summary>
+        public int Energy { get; set; }
+
+
+
+        #region 相关衍生数据
+
+
         /// <summary>
         /// HP
         /// </summary>
@@ -35,7 +48,9 @@ namespace com.Doge.GroupGame.Plugin
                 return Level * 10 + 40;
             }
         }
-
+        /// <summary>
+        /// 最大攻击力
+        /// </summary>
         public int MaxAttack
         {
             get
@@ -43,6 +58,9 @@ namespace com.Doge.GroupGame.Plugin
                 return Level * 3 + 7;
             }
         }
+        /// <summary>
+        /// 最小攻击力
+        /// </summary>
         public int MinAttack
         {
             get
@@ -50,23 +68,9 @@ namespace com.Doge.GroupGame.Plugin
                 return Level + 5;
             }
         }
-    }
 
-    /// <summary>
-    /// 状态
-    /// </summary>
-    public enum State
-    {
-        /// <summary>
-        /// 正常
-        /// </summary>
-        Normal = 0,
-        /// <summary>
-        /// 死
-        /// </summary>
-        Dead = 1
+        #endregion
     }
-
 
     public class Game
     {

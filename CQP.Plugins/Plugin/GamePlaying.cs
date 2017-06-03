@@ -16,7 +16,7 @@ namespace com.Doge.GroupGame.Plugin
         /// <summary>
         /// 随机数生成
         /// </summary>
-        private static Random m_Rand = new Random();
+        private static Random m_Rand = new Random(DateTime.Now.Second + DateTime.Now.Millisecond - DateTime.Now.Minute);
 
         /// <summary>
         /// 等级描述字典
@@ -314,6 +314,44 @@ namespace com.Doge.GroupGame.Plugin
 
             return result;
         }
+
+        /// <summary>
+        /// 判定受伤
+        /// </summary>
+        /// <param name="attacklevel">攻方等级</param>
+        /// <param name="attackedLevel">受方等级</param>
+        /// <returns></returns>
+        public static int Injury(int attacklevel, int attackedLevel)
+        {
+            int injury = 0;
+            if (attacklevel - attackedLevel <= -3)
+            {
+                int injr = m_Rand.Next(100);
+                if (injr < 20)
+                {
+                    injury = 1;
+                    if (injr < 10)
+                    {
+                        injury = 2;
+                    }
+                }
+            }
+            else
+            {
+                int injr = m_Rand.Next(100);
+                if (injr <= (30 + attacklevel - attackedLevel))
+                {
+                    injury = 1;
+                    if (injr <= (10 + attacklevel - attackedLevel))
+                    {
+                        injury = 2;
+                    }
+                }
+            }
+            return injury;
+        }
+
+
 
 
         #endregion

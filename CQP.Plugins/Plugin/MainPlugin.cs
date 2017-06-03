@@ -33,16 +33,29 @@ namespace com.Doge.GroupGame.Plugin
 
         #endregion
 
-        #region flag
+        #region flag and Timer
 
+        /// <summary>
+        /// 忙碌标志
+        /// </summary>
         private bool m_flag;
-
-        System.Timers.Timer m_Timer = new System.Timers.Timer(300);
+        /// <summary>
+        /// 忙碌计数器
+        /// </summary>
+        private System.Timers.Timer m_Timer = new System.Timers.Timer(300);
 
         /// <summary>
         /// 保存数据库timer 20分钟保存一次游戏数据
         /// </summary>
-        System.Timers.Timer m_SaveGameTimer = new System.Timers.Timer(1200000);
+        private System.Timers.Timer m_SaveGameTimer = new System.Timers.Timer(1200000);
+
+        /// <summary>
+        /// 活力timer 1分钟添加一次活力
+        /// </summary>
+        private System.Timers.Timer m_EnergyTimer = new System.Timers.Timer(60000);
+
+        private int m_EnergyCount = 10;
+
         #endregion
 
 
@@ -78,6 +91,10 @@ namespace com.Doge.GroupGame.Plugin
                         else if (msg.Contains("#查询等级名称"))
                         {
                             AskForLevelDescriptionThread(fromQq, msg, fromGroup);
+                        }
+                        else if (msg.Contains("#查询活力恢复"))
+                        {
+                            AskForAddEnergyTimeThread(msg, fromGroup);
                         }
                         else if (msg.Contains("攻击") || msg.Contains("战斗"))
                         {
@@ -375,6 +392,9 @@ namespace com.Doge.GroupGame.Plugin
                         CoolQApi.SendPrivateMsg(fromqq, "获取群成员玩家信息完成！");
                         AutoSaveGameStart();
                         CoolQApi.SendPrivateMsg(fromqq, "已开启自动保存！");
+                        SetEnergyFull(qqgroup);
+                        AutoAddEnergy();
+                        CoolQApi.SendPrivateMsg(fromqq, "已开启自动补充活力！");
                     };
 
 
@@ -502,7 +522,27 @@ namespace com.Doge.GroupGame.Plugin
                         var player = game.Players.FirstOrDefault(t => t.QQ == targetqq);
                         if (player != null)
                         {
-                            string ans = "玩家" + CoolQCode.At(targetqq) + "  等级 ：[" + player.Level + "]" + GamePlaying.LevelDic[player.Level] + "  状态：" + (player.State == 0 ? "正常" : "死亡");
+                            string statestring = "";
+                            switch (player.State)
+                            {
+                                case 0:
+                                    statestring = "正常";
+                                    break;
+                                case 1:
+                                    statestring = "轻伤";
+                                    break;
+                                case 2:
+                                    statestring = "重伤";
+                                    break;
+                                case 9:
+                                    statestring = "修炼中";
+                                    break;
+                            }
+
+                            string ans = "玩家" + CoolQCode.At(targetqq)
+                                + "  等级 ：[" + player.Level + "]" + GamePlaying.LevelDic[player.Level]
+                                + "  状态 ： " + statestring
+                                + "  活力值 ： " + player.Energy;
                             CoolQApi.SendGroupMsg(groupqq, ans);
                         }
                     }
@@ -516,7 +556,27 @@ namespace com.Doge.GroupGame.Plugin
                     var player = game.Players.FirstOrDefault(t => t.QQ == fromqq);
                     if (player != null)
                     {
-                        string ans = "玩家" + CoolQCode.At(fromqq) + "  等级 ：[" + player.Level + "]" + GamePlaying.LevelDic[player.Level] + "  状态 ：" + (player.State == 0 ? "正常" : "死亡");
+                        string statestring = "";
+                        switch (player.State)
+                        {
+                            case 0:
+                                statestring = "正常";
+                                break;
+                            case 1:
+                                statestring = "轻伤";
+                                break;
+                            case 2:
+                                statestring = "重伤";
+                                break;
+                            case 9:
+                                statestring = "修炼中";
+                                break;
+                        }
+
+                        string ans = "玩家" + CoolQCode.At(fromqq)
+                            + "  等级 ：[" + player.Level + "]" + GamePlaying.LevelDic[player.Level]
+                            + "  状态 ： " + statestring
+                            + "  活力值 ： " + player.Energy;
                         CoolQApi.SendGroupMsg(groupqq, ans);
                     }
                 }
@@ -533,6 +593,96 @@ namespace com.Doge.GroupGame.Plugin
             object[] paramaters = new object[] { groupqq, msg, fromqq };
             Thread mainThread = new Thread(new ParameterizedThreadStart(GetPlayerInfo));
             mainThread.Start(paramaters);
+        }
+        /// <summary>
+        /// 设置活力满,健康状态正常
+        /// </summary>
+        /// <param name="groupqq"></param>
+        public void SetEnergyFull(long groupqq)
+        {
+            var game = m_GameList.FirstOrDefault(t => t.QQGroup == groupqq);
+            if (game != null)
+            {
+                game.Players.ForEach(t => t.Energy = 3);
+                game.Players.ForEach(t => t.State = 0);
+            }
+        }
+        /// <summary>
+        /// 自动补充活力
+        /// </summary>
+        public void AutoAddEnergy()
+        {
+            m_EnergyTimer.Stop();
+            m_EnergyCount = 10;
+            m_EnergyTimer.Elapsed += (sender, args) =>
+            {
+                m_EnergyCount --;
+                if (m_EnergyCount == 0)
+                {
+                    foreach (var game in m_GameList)
+                    {
+                        foreach (var player in game.Players)
+                        {
+                            if (player.Energy < 3)
+                            {
+                                player.Energy++;
+                            }
+                        }
+                    }
+                    m_EnergyCount = 10;
+                }
+
+            };
+            m_EnergyTimer.Start();
+
+        }
+
+        private void AskForAddEnergyTimeThread(string msg, long fromgroup)
+        {
+            object[] paramaters = new object[] {msg, fromgroup };
+            Thread mainThread = new Thread(new ParameterizedThreadStart(AskForAddEnergyTime));
+            mainThread.Start(paramaters);
+        }
+
+        public void AskForAddEnergyTime(object o)
+        {
+            object[] paramaters = (object[])o;
+            string msg = paramaters[0].ToString();
+            long groupqq = (long)paramaters[1];
+            if (msg.Contains("#查询活力恢复"))
+            {
+                string ans = $"距离恢复活力还有{m_EnergyCount}分钟！";
+                CoolQApi.SendGroupMsg(groupqq, ans);
+            }
+        }
+
+        /// <summary>
+        /// 受伤自动康复
+        /// </summary>
+        /// <param name="qqgroup"></param>
+        /// <param name="player"></param>
+        /// <param name="state"></param>
+        public void AutoRemoveInjury(long qqgroup, Player player, int state)
+        {
+            System.Timers.Timer injurytimer = null;
+            if (state == 1)
+            {
+                injurytimer = new System.Timers.Timer(1800000);
+            }
+            else if (state == 2)
+            {
+                injurytimer = new System.Timers.Timer(3600000);
+            }
+            if (injurytimer != null)
+            {
+                injurytimer.Elapsed += (sender, args) =>
+                {
+                    player.State = 0;
+                    injurytimer.Stop();
+                    CoolQApi.SendGroupMsg(qqgroup, $"{player.Name}的伤已经好转了！");
+                };
+                injurytimer.Start();
+            }
         }
 
         /// <summary>
@@ -559,20 +709,54 @@ namespace com.Doge.GroupGame.Plugin
                         var player2 = game.Players.FirstOrDefault(t => t.QQ == targetqq);
                         if (player1 != null && player2 != null)
                         {
+                            if (player1.Energy <= 0)
+                            {
+                                CoolQApi.SendGroupMsg(groupqq, $"{player1.Name}没有活力值了，无法采取行动！");
+                                return;
+                            }
+                            if (player1.State == 1 || player1.State == 2)
+                            {
+                                CoolQApi.SendGroupMsg(groupqq, $"{player1.Name}现在受伤了，不能采取行动！");
+                                return;
+                            }
+                            if (player2.State == 1 || player2.State == 2)
+                            {
+                                CoolQApi.SendGroupMsg(groupqq, $"{player2.Name}现在受伤了，不能进行攻击！");
+                                return;
+                            }
+                            //耗费1个活力值
+                            player1.Energy--;
+
                             //获取胜负结果
                             var battleresult = GamePlaying.Battle(player1, player2);
                             //人名替换
                             string outmsg = battleresult.BattleDescription.Replace("AAA", player1.Name);
                             outmsg = outmsg.Replace("BBB", player2.Name);
-                            //判断升级
+
                             if (battleresult.Winner != null && battleresult.Loser != null)
                             {
+                                //判断受伤
+                                int state = GamePlaying.Injury(battleresult.Winner.Level, battleresult.Loser.Level);
+                                if (state == 1)
+                                {
+                                    battleresult.Loser.State = state;
+                                    AutoRemoveInjury(groupqq, battleresult.Loser, state);
+                                    outmsg += $"\n{battleresult.Loser.Name}受了轻伤！好像无法战斗了！";
+                                }
+                                else if (state == 2)
+                                {
+                                    battleresult.Loser.State = state;
+                                    AutoRemoveInjury(groupqq, battleresult.Loser, state);
+                                    outmsg += $"\n{battleresult.Loser.Name}被打成重伤！好惨啊！";
+                                }
+
+                                //判断升级
                                 int newlevel = 0;
                                 if (GamePlaying.LevelUp(battleresult.Winner.Level, battleresult.Loser.Level,
                                     out newlevel))
                                 {
                                     battleresult.Winner.Level = newlevel;
-                                    outmsg += $"\n\n{battleresult.Winner.Name}升级了！，达到了[{battleresult.Winner.Level}]{GamePlaying.LevelDic[battleresult.Winner.Level]}！";
+                                    outmsg += $"\n{battleresult.Winner.Name}升级了！，达到了[{battleresult.Winner.Level}]{GamePlaying.LevelDic[battleresult.Winner.Level]}！";
                                 }
 
                             }
@@ -693,12 +877,13 @@ namespace com.Doge.GroupGame.Plugin
         /// </summary>
         private void AutoSaveGameStart()
         {
+            m_SaveGameTimer.Stop();
             m_SaveGameTimer.Elapsed += (sender, args) =>
             {
                 foreach (var game in m_GameList)
                 {
-                    SaveGame(game.QQGroup);
-                    CoolQApi.SendPrivateMsg(719539302, $"{game.QQGroup}群的数据已经保存！");
+                    SqliteHelper.Instance.UpdatePlayers(game.QQGroup, game.Players);
+                    //CoolQApi.SendPrivateMsg(719539302, $"{game.QQGroup}群的数据已经保存！");
                 }
             };
             m_SaveGameTimer.Start();
