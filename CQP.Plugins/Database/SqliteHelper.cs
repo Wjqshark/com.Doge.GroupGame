@@ -4,10 +4,10 @@ using System.Data.SQLite;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using com.Doge.GroupGame.Plugin;
+using com.Doge.Cha2.Plugin;
 using Newbe.CQP.Framework;
 
-namespace com.Doge.GroupGame.Database
+namespace com.Doge.Cha2.Database
 {
     public class SqliteHelper
     {
@@ -25,7 +25,9 @@ namespace com.Doge.GroupGame.Database
                     lock (lockHelper)
                     {
                         if (m_Instance == null)
+                        {
                             m_Instance = new SqliteHelper();
+                        }
                     }
                 }
                 return m_Instance;
@@ -34,9 +36,8 @@ namespace com.Doge.GroupGame.Database
 
         #endregion
 
-        private SQLiteConnection m_DbConnection;
-
-        private string m_DbUrl = @"D://GameDb.sqlite";
+        //private string m_DbUrl = @"‪‪C:\messageDB\Messages.db";
+        private string m_DbUrl = @"‪‪Messages.db";
 
         /// <summary>
         /// 设置连接串
@@ -51,35 +52,98 @@ namespace com.Doge.GroupGame.Database
         #region Sql查询
 
         /// <summary>
-        /// 获取等级名称
+        /// 获取最后一条消息的Index
         /// </summary>
         /// <returns></returns>
-        public Dictionary<int, string> GetLevelsName()
+        public long GetLastMessageIndex()
         {
-            Dictionary<int, string> dictionary = new Dictionary<int, string>();
-
+            long indx = 0;
             try
             {
-                string sql = string.Format("Select * from Level");
+                string sql = string.Format("Select max(MSG.'Index') as max from MSG");
                 string constr = $"Data Source={m_DbUrl};";
-                m_DbConnection = new SQLiteConnection(constr);
-                m_DbConnection.Open();
-                SQLiteCommand command = new SQLiteCommand(sql, m_DbConnection);
+                var DbConnection = new SQLiteConnection(constr);
+                DbConnection.Open();
+                SQLiteCommand command = new SQLiteCommand(sql, DbConnection);
                 var reader = command.ExecuteReader();
                 while (reader.Read())
                 {
-                    int level = int.Parse(reader["Level"].ToString());
-                    string description = reader["Description"].ToString();
-                    dictionary.Add(level, description);
+
+                    if (!long.TryParse(reader["max"].ToString(), out indx))
+                    {
+                        indx = 0;
+                    }
                 }
-                m_DbConnection.Close();
+                DbConnection.Close();
+
+                return indx;
+            }
+            catch (Exception ee)
+            {
+                return indx;
+            }
+
+        }
+
+        /// <summary>
+        /// 插入消息
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public int InsertMessage(Messages message)
+        {
+            int indx = 0;
+
+            try
+            {
+                string sql1 = $"INSERT INTO MSG ('Qq', 'Message', 'ReceivedTime') VALUES ('{message.Qq}','{message.Message}','{message.ReceivedTime}')";
+                string constr = $"Data Source={m_DbUrl};";
+                var DbConnection = new SQLiteConnection(constr);
+                DbConnection.Open();
+                SQLiteCommand command = new SQLiteCommand(sql1, DbConnection);
+                indx = command.ExecuteNonQuery();
+                DbConnection.Close();
+                return indx;
             }
             catch (Exception ee)
             {
                 throw ee;
             }
 
-            return dictionary;
+        }
+
+
+        /// <summary>
+        /// 获取第Index条消息
+        /// </summary>
+        /// <returns></returns>
+        public Messages GetMessageIndex(long indx)
+        {
+            try
+            {
+                string sql = $"Select * from MSG where MSG.'Index' ={indx}";
+                string constr = $"Data Source={m_DbUrl};";
+                var DbConnection = new SQLiteConnection(constr);
+                DbConnection.Open();
+                SQLiteCommand command = new SQLiteCommand(sql, DbConnection);
+                var reader = command.ExecuteReader();
+                Messages message = new Messages();
+                while (reader.Read())
+                {
+                    message.Index = long.Parse(reader["Index"].ToString());
+                    message.Qq = reader["Qq"].ToString();
+                    message.Message = reader["Message"].ToString();
+                    message.ReceivedTime = reader["ReceivedTime"].ToString();
+                }
+                DbConnection.Close();
+
+                return message;
+            }
+            catch (Exception ee)
+            {
+                throw ee;
+            }
+
         }
 
         /// <summary>
@@ -87,91 +151,91 @@ namespace com.Doge.GroupGame.Database
         /// </summary>
         /// <param name="groupqq"></param>
         /// <returns></returns>
-        public List<Player> GetPlayersFromDb(long groupqq)
-        {
-            List<Player> players = new List<Player>();
-            try
-            {
-                string sql = string.Format("SELECT * from Player WHERE [Group] = '{0}' ", groupqq);
-                string constr = $"Data Source={m_DbUrl};";
-                m_DbConnection = new SQLiteConnection(constr);
-                m_DbConnection.Open();
-                SQLiteCommand command = new SQLiteCommand(sql, m_DbConnection);
-                var reader = command.ExecuteReader();
-                while (reader.Read())
-                {
-                    Player player = new Player();
-                    player.QQ = long.Parse(reader["QQ"].ToString());
-                    player.Level = int.Parse(reader["Level"].ToString());
-                    player.State = int.Parse(reader["State"].ToString());
-                    players.Add(player);
-                }
-                m_DbConnection.Close();
-            }
-            catch (Exception ee)
-            {
-                throw ee;
-            }
-            return players;
-        }
+        //public List<Player> GetPlayersFromDb(long groupqq)
+        //{
+        //    List<Player> players = new List<Player>();
+        //    try
+        //    {
+        //        string sql = string.Format("SELECT * from Player WHERE [Group] = '{0}' ", groupqq);
+        //        string constr = $"Data Source={m_DbUrl};";
+        //        m_DbConnection = new SQLiteConnection(constr);
+        //        m_DbConnection.Open();
+        //        SQLiteCommand command = new SQLiteCommand(sql, m_DbConnection);
+        //        var reader = command.ExecuteReader();
+        //        while (reader.Read())
+        //        {
+        //            Player player = new Player();
+        //            player.QQ = long.Parse(reader["QQ"].ToString());
+        //            player.Level = int.Parse(reader["Level"].ToString());
+        //            player.State = int.Parse(reader["State"].ToString());
+        //            players.Add(player);
+        //        }
+        //        m_DbConnection.Close();
+        //    }
+        //    catch (Exception ee)
+        //    {
+        //        throw ee;
+        //    }
+        //    return players;
+        //}
         /// <summary>
         /// 从数据库查玩家
         /// </summary>
         /// <param name="groupqq"></param>
         /// <param name="qq"></param>
         /// <returns></returns>
-        public Player GetPlayerFromDb(long groupqq, long qq)
-        {
-            Player player = null;
-            try
-            {
-                string sql = $"SELECT * from Player WHERE [Group] = '{groupqq}' and QQ = '{qq}' ";
-                string constr = $"Data Source={m_DbUrl};";
-                m_DbConnection = new SQLiteConnection(constr);
-                m_DbConnection.Open();
-                SQLiteCommand command = new SQLiteCommand(sql, m_DbConnection);
-                var reader = command.ExecuteReader();
-                while (reader.Read())
-                {
-                    player.QQ = long.Parse(reader["QQ"].ToString());
-                    player.Level = int.Parse(reader["Level"].ToString());
-                    player.State = int.Parse(reader["State"].ToString());
-                    break;
-                }
-                m_DbConnection.Close();
-            }
-            catch (Exception ee)
-            {
-                throw ee;
-            }
-            return player;
-        }
+        //public Player GetPlayerFromDb(long groupqq, long qq)
+        //{
+        //    Player player = null;
+        //    try
+        //    {
+        //        string sql = $"SELECT * from Player WHERE [Group] = '{groupqq}' and QQ = '{qq}' ";
+        //        string constr = $"Data Source={m_DbUrl};";
+        //        m_DbConnection = new SQLiteConnection(constr);
+        //        m_DbConnection.Open();
+        //        SQLiteCommand command = new SQLiteCommand(sql, m_DbConnection);
+        //        var reader = command.ExecuteReader();
+        //        while (reader.Read())
+        //        {
+        //            player.QQ = long.Parse(reader["QQ"].ToString());
+        //            player.Level = int.Parse(reader["Level"].ToString());
+        //            player.State = int.Parse(reader["State"].ToString());
+        //            break;
+        //        }
+        //        m_DbConnection.Close();
+        //    }
+        //    catch (Exception ee)
+        //    {
+        //        throw ee;
+        //    }
+        //    return player;
+        //}
         /// <summary>
         /// 更新玩家数据入库
         /// </summary>
         /// <param name="group"></param>
         /// <param name="players"></param>
-        public void UpdatePlayers(long group,List<Player> players)
-        {
-            try
-            {
-                string sql = "";
-                foreach (var player in players)
-                {
-                    sql += $"Replace INTO Player VALUES ( '{player.QQ}' ,'{group}' ,{player.Level} , {player.State} );";
-                }
-                string constr = $"Data Source={m_DbUrl};";
-                m_DbConnection = new SQLiteConnection(constr);
-                m_DbConnection.Open();
-                SQLiteCommand command = new SQLiteCommand(sql, m_DbConnection);
-                command.ExecuteNonQuery();
-                m_DbConnection.Close();
-            }
-            catch (Exception ee)
-            {
-                throw ee;
-            }
-        }
+        //public void UpdatePlayers(long group,List<Player> players)
+        //{
+        //    try
+        //    {
+        //        string sql = "";
+        //        foreach (var player in players)
+        //        {
+        //            sql += $"Replace INTO Player VALUES ( '{player.QQ}' ,'{group}' ,{player.Level} , {player.State} );";
+        //        }
+        //        string constr = $"Data Source={m_DbUrl};";
+        //        m_DbConnection = new SQLiteConnection(constr);
+        //        m_DbConnection.Open();
+        //        SQLiteCommand command = new SQLiteCommand(sql, m_DbConnection);
+        //        command.ExecuteNonQuery();
+        //        m_DbConnection.Close();
+        //    }
+        //    catch (Exception ee)
+        //    {
+        //        throw ee;
+        //    }
+        //}
 
         #endregion
 

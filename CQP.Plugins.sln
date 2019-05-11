@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+# Visual Studio 15
+VisualStudioVersion = 15.0.27703.2026
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.Doge.GroupGame", "CQP.Plugins\com.Doge.GroupGame.csproj", "{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.doge.cha2", "CQP.Plugins\com.doge.cha2.csproj", "{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,5 +18,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F253B992-3B3D-42B4-B9DB-006E5C155318}
 	EndGlobalSection
 EndGlobal

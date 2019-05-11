@@ -8,8 +8,8 @@
     <ProjectGuid>{C9A251D2-E9D1-4664-BCB9-AA50CD47724A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>com.Doge.GroupGame</RootNamespace>
-    <AssemblyName>com.Doge.GroupGame</AssemblyName>
+    <RootNamespace>com.Doge.Cha2</RootNamespace>
+    <AssemblyName>com.doge.cha2</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <NuGetPackageImportStamp>
@@ -86,7 +86,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Database\SqliteHelper.cs" />
-    <Compile Include="Plugin\GamePlaying.cs" />
     <Compile Include="Plugin\MainPlugin.cs" />
     <Compile Include="Plugin\Models.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -94,7 +93,7 @@
   <ItemGroup>
     <None Include="App.config" />
     <None Include="Newbe.CQP.Framework.props" />
-    <None Include="Newbe.CQP.Framework\ForPlugin\com.Doge.GroupGame.json" />
+    <None Include="Newbe.CQP.Framework\ForPlugin\com.doge.cha2.json" />
     <None Include="Newbe.CQP.Framework\ForPlugin\Newbe.CQP.Framework.json" />
     <None Include="packages.config" />
   </ItemGroup>
